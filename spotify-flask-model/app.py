@@ -1,4 +1,9 @@
 import pandas as pd
+import numpy as np
+import io
+from math import pi
+import base64
+import matplotlib.pyplot as plt
 from flask import Flask, jsonify, request
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.neighbors import NearestNeighbors
@@ -11,7 +16,7 @@ CORS(app)
 
 engine = create_engine('sqlite:///db.sqlite3', echo=False)
 songs_df =  pd.read_sql_table('songs', 'sqlite:///db.sqlite3')
-
+# songs_df = pd.read_csv('/Users/curtismckendrick/lambda school repositories/build_weeks/Spotify_Model/data_science/Data/SpotifyAudioFeaturesApril2019_duplicates_removed.csv')
 
 # infile = "https://raw.githubusercontent.com/spotify-recommendation-engine-3/data_science/master/Data/SpotifyAudioFeaturesApril2019_duplicates_removed.csv"
 # songs_df = pd.read_csv(infile)
@@ -25,7 +30,7 @@ def spider_plot(df_with_titles):
 
     unwanted = categoricals + misleading
     
-    # number of variable
+    # number of variables
     df = df_with_titles.copy()
     df = df.drop(unwanted, 
                  axis=1)
@@ -79,8 +84,6 @@ def spider_plot(df_with_titles):
     # "3" is currently how many of the top 9 closest songs we are choosing to show
     for i in range(num_neighbors):
         
-        # Again repeat the first value in the array to close the circle
-        # skipping the first row, because that's the target song
         # Again repeat the first value in the array to close the circle
         # skipping the first row, because that's the target song
         diff_values = df.iloc[i+1].values.flatten().tolist()
@@ -137,20 +140,27 @@ def spider_plot(df_with_titles):
     # show the plot
     ax.legend()
 
+    # # DEPRECATED: return encoded figure
     pic_IObytes = io.BytesIO()
     plt.savefig(pic_IObytes,  format='png', 
                 facecolor=fig.get_facecolor(), edgecolor='none')
     pic_IObytes.seek(0)
     pic_hash = base64.b64encode(pic_IObytes.read())
-    # plt.show()
-    
     return pic_hash
+
+    # return fig
 
 def preprocess(df):
     """ normalizes pandas df.
     Removes unecessary columns """
-    drop_cols = ['duration_ms', 'key', 'mode', 'time_signature', 'popularity','tempo']
-    df = df.drop(columns=drop_cols)
+    drop_cols = ['duration_ms', 'key', 'mode', 'time_signature', 'popularity', 'tempo']
+    drop_cols += ['track_id', 'track_name', 'artist_name']
+    for col in drop_cols:
+        if col in list(df.columns):
+            df = df.drop(columns=col)
+    # drop_cols = ['key', 'mode', 'time_signature', 'popularity', 'tempo']
+    # artist_name,track_id,track_name,acousticness,danceability,duration_ms,energy,instrumentalness,key,liveness,loudness,mode,speechiness,tempo,time_signature,valence,popularity
+    # df = df.drop(columns=drop_cols)
     return df
 
 def create_model(X, n_neighbors=10):
@@ -172,7 +182,7 @@ def suggest_songs(source_song, model):
     pic_hash = spider_plot(songs_df_norm.iloc[recommendations])
     recommendations_dict = y.iloc[recommendations][1:].reset_index(drop=True).T.to_dict()
     recommendations_dict['encoded_image'] = pic_hash
-    print(recommendations_dict)
+    # print(recommendations_dict)
     return recommendations_dict
 
 my_model = create_model(preprocess(X))
@@ -182,12 +192,13 @@ def returnAll():
     song_dict = {"artist_name":"YG","track_id":"2RM4jf1Xa9zPgMGRDiht8O","track_name":"Big Bank feat. 2 Chainz, Big Sean, Nicki Minaj","acousticness":0.00582,"danceability":0.743,"duration_ms":238373,"energy":0.339,"instrumentalness":0.0,"key":1,"liveness":0.0812,"loudness":-7.678,"mode":1,"speechiness":0.409,"tempo":203.927,"time_signature":4,"valence":0.118,"popularity":15}
     song_dict.update((x, [y]) for x, y in song_dict.items())
     song_df = pd.DataFrame.from_dict(song_dict)
-    song_df = song_df[song_df.columns[3:]]
-
+    song_df = song_df.iloc[:, 3:]
+    # song_df = song_df[song_df.columns[3:]]
     
     result = suggest_songs(song_df, my_model)
 
     return jsonify(result)
+    # return f"Hello World"
 
 @app.route('/pred', methods=['POST'])
 def runPred():
@@ -196,7 +207,8 @@ def runPred():
     input_song.update((x, [y]) for x, y in input_song.items())
 
     song_df = pd.DataFrame.from_dict(input_song)
-    song_df = song_df[song_df.columns[3:]]
+    song_df = song_df.iloc[:, 3:]
+    # song_df = song_df[song_df.columns[3:]]
     
     results = suggest_songs(song_df, my_model)
 
