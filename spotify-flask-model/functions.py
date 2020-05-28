@@ -115,7 +115,7 @@ def spider_plot(df_with_titles, fig):
     fig.suptitle(f'Audio Features of your song (in green) and our Recommendations for you', color='white')
     
     # show the plot
-    legend = ax.legend(facecolor='gray', framealpha=0.15)
+    legend = ax.legend(facecolor='gray', framealpha=0.10, loc="upper left", fontsize=8.5)
     for text in legend.get_texts():
         text.set_color('white')
 
